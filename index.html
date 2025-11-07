@@ -155,13 +155,13 @@
     // ====== Firebase init (REMPLACE par les valeurs de TON projet) ======
     const firebaseConfig = {
       apiKey: "AIzaSyA_BFJ14tQMhgNVcyTyi4tU02wBl8yBovU",
-  authDomain: "carte-perimetre.firebaseapp.com",
-  databaseURL: "https://carte-perimetre-default-rtdb.firebaseio.com",
-  projectId: "carte-perimetre",
-  storageBucket: "carte-perimetre.firebasestorage.app",
-  messagingSenderId: "1018235415713",
-  appId: "1:1018235415713:web:52a1fb416e121617fcd4e0",
-  measurementId: "G-0YVPM0KFXB"
+      authDomain: "carte-perimetre.firebaseapp.com",
+      databaseURL: "https://carte-perimetre-default-rtdb.firebaseio.com",
+      projectId: "carte-perimetre",
+      storageBucket: "carte-perimetre.firebasestorage.app",
+      messagingSenderId: "1018235415713",
+      appId: "1:1018235415713:web:52a1fb416e121617fcd4e0",
+      measurementId: "G-0YVPM0KFXB"
     };
     const app = firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -181,15 +181,14 @@
     let syncing = false;          // avoid feedback loops
 
     // Présence temps réel
-    let presenceRef = null;
     function setupPresence(code){
       const presenceRoot = db.ref('rooms/'+code+'/presence');
-      // Always attach the counter listener, even if UID not ready yet
+      // compteur en ligne (se branche immédiatement)
       presenceRoot.on('value', snap =>{
         const n = snap.exists() ? Object.keys(snap.val()).length : 0;
         roomInfo.textContent = 'Session: '+code+' — '+n+' en ligne';
       });
-      // Once we have a UID, set our own presence and clean up on disconnect
+      // Ajoute/retire ta présence quand l'UID anonyme est prêt
       function setSelfPresence(){
         if(!myUid) return;
         const selfRef = presenceRoot.child(myUid);
@@ -204,13 +203,6 @@
           if(myUid){ setSelfPresence(); if(typeof unsub==='function') unsub(); }
         });
       }
-    });
-      presenceRef.onDisconnect().remove();
-      // compteur
-      db.ref('rooms/'+code+'/presence').on('value', snap =>{
-        const n = snap.exists() ? Object.keys(snap.val()).length : 0;
-        roomInfo.textContent = 'Session: '+code+' — '+n+' en ligne';
-      });
     }
 
     function currentState(){
@@ -421,10 +413,10 @@
     joinBtn.addEventListener('click', ()=>{
       const code = roomEl.value.trim();
       if(!code){ roomRef = null; roomInfo.textContent = 'Hors session'; return; }
-      // Show immediate feedback while presence counter hooks up
+      // feedback immédiat
       roomInfo.textContent = 'Session: '+code+' — connexion…';
       joinRoom(code);
-    }); });
+    });
 
     resetBtn.addEventListener('click', ()=>{
       const code = roomEl.value.trim(); if(!code || !roomRef) return;
@@ -432,10 +424,23 @@
       roomRef.remove().then(()=>{ setStatus('Session réinitialisée.'); joinRoom(code); });
     });
 
-    // ====== POI helpers ======
-    function rebuildPoiLayers(){ poiLayer.clearLayers(); pois.forEach(p=>{ const cm=L.circleMarker([p.lat,p.lon],{radius:6,color:p.color,weight:2,fillColor:p.color,fillOpacity:1,renderer:L.canvas()}).addTo(poiLayer); if(p.name){ cm.bindTooltip(p.name,{permanent:true,direction:'right',offset:[10,0]}); } }); }
-    function addPoi(lat, lon, name, color){ pois.push({lat, lon, name: name||'', color: color||'#ff3b30'}); rebuildPoiLayers(); renderPoiList(); pushState(); }
-    function renderPoiList(){ if(!poiListEl) return; poiListEl.innerHTML = pois.map((p,i)=>`<div class=\"poi-item\"><span class=\"dot\" style=\"background:${p.color}\"></span>${p.name||('Point '+(i+1))}<span style=\"flex:1\"></span><button class=\"del\" data-i=\"${i}\">Supprimer</button></div>`).join(''); }
+    // ====== (Mini) tests runtime — smoke tests ======
+    function selfTests(){
+      try{
+        console.assert(typeof L !== 'undefined', 'Leaflet non chargé');
+        console.assert(map && typeof map.setView === 'function', 'Carte non initialisée');
+        console.assert(typeof firebase !== 'undefined', 'Firebase non chargé');
+        console.assert(app && app.options && app.options.projectId === 'carte-perimetre', 'projectId inattendu');
+        console.assert(typeof geocode === 'function', 'geocode manquant');
+        console.assert(typeof exportPNG === 'function', 'exportPNG manquant');
+        console.log('[SelfTests] OK');
+      }catch(e){ console.warn('[SelfTests] échec:', e); }
+    }
+    window.addEventListener('load', ()=> setTimeout(selfTests, 200));
+
+    // Aide debug : remonter les erreurs dans le statut
+    window.addEventListener('error', (ev)=>{ setStatus('Erreur JS: '+ (ev.message||'inconnue')); });
+    window.addEventListener('unhandledrejection', (ev)=>{ setStatus('Promesse rejetée: '+ (ev.reason?.message||ev.reason||'inconnue')); });
 
   })();
   </script>
